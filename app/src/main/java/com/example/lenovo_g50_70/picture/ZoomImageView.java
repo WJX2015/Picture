@@ -3,6 +3,7 @@ package com.example.lenovo_g50_70.picture;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
@@ -142,10 +143,67 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
                 scaleFactor=mMaxScale/scale;
             }
             //放大缩小平移等操作
-            mScaleMatrix.postScale(scaleFactor,scaleFactor,getWidth()/2,getHeight()/2);
+            mScaleMatrix.postScale(scaleFactor,scaleFactor,detector.getFocusX(),detector.getFocusY());
+
+            checkBorderAndCenterWhenScale();
+
             setImageMatrix(mScaleMatrix);
         }
         return true;
+    }
+
+    //获得图片放大缩小后的宽和高，以及left,top,right,bottom
+    private RectF getMatrixRectF(){
+        Matrix matrix=mScaleMatrix;
+        RectF rectF =new RectF();
+        Drawable drawable =getDrawable();
+        if(drawable!=null){
+            rectF.set(0,0, drawable.getIntrinsicWidth(),drawable.getIntrinsicHeight());
+            matrix.mapRect(rectF);
+        }
+        return rectF;
+    }
+
+    //在缩放时，进行边界控制以及图片位置的控制
+    private void checkBorderAndCenterWhenScale() {
+        RectF rect=getMatrixRectF();
+        //XY偏移操作
+        float deltaX=0;
+        float deltaY=0;
+        //拿到控件的宽高
+        int width=getWidth();
+        int height=getHeight();
+
+        //缩放时水平方向的检测,防止出现白边
+        if(rect.width()>=width){
+            if(rect.left>0){//rect.left是一个屏幕坐标值，0为屏幕最左端
+                //当图片左边与屏幕有空隙时，向左平移图片
+                deltaX=-rect.left;
+            }
+            if(rect.right<width){//同理，width是屏幕最右端
+                //当图片右边与屏幕有空隙时，向右平移图片
+                deltaX=width-rect.right;
+            }
+        }
+
+        //缩放时垂直方向的检测,防止出现白边
+        if(rect.height()>=height){
+            if(rect.top>0){
+                deltaY=-rect.top;
+            }
+            if(rect.bottom<height){
+                deltaY=height-rect.bottom;
+            }
+        }
+
+        //如果宽度或者高度小于控件的宽或者高,则让其居中
+        if(rect.width()<width){
+            deltaX=width/2-rect.right+rect.width()/2;
+        }
+        if(rect.height()<height){
+            deltaY=height/2-rect.bottom+rect.height()/2;
+        }
+        mScaleMatrix.postTranslate(deltaX,deltaY);
     }
 
     @Override
