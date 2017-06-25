@@ -10,6 +10,7 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 
@@ -27,10 +28,19 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     private float mMidScale;
     //最大的放大值
     private float mMaxScale;
-
+    //矩阵
     private Matrix mScaleMatrix;
     //捕获用户多点触控时缩放的比例
     private ScaleGestureDetector mDetector;
+    //自由移动------------------------------
+    //记录上一次多点触控的数量
+    private int mLastPointerCount;
+    //记录上一次多点触控的中心点
+    private float mLastX;
+    private float mLastY;
+
+    private int mTouchSlop;
+    private boolean isCanDrag;
 
     public ZoomImageView(Context context) {
         this(context,null);
@@ -51,6 +61,8 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
         //上下文，接口对象
         mDetector =new ScaleGestureDetector(context,this);
         setOnTouchListener(this);
+
+        mTouchSlop= ViewConfiguration.get(context).getScaledTouchSlop();
     }
 
     @Override
@@ -76,11 +88,13 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
             //得到控件的宽高
             int width=getWidth();
             int height=getHeight();
+
             //得到我们的图片，以及宽高
             Drawable drawable=getDrawable();
             if(drawable==null){
                 return;
             }
+
             int dw=drawable.getIntrinsicWidth();
             int dh=drawable.getIntrinsicHeight();
 
@@ -167,9 +181,11 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     //在缩放时，进行边界控制以及图片位置的控制
     private void checkBorderAndCenterWhenScale() {
         RectF rect=getMatrixRectF();
-        //XY偏移操作
+
+        // /XY偏移操作
         float deltaX=0;
         float deltaY=0;
+
         //拿到控件的宽高
         int width=getWidth();
         int height=getHeight();
@@ -220,6 +236,86 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     public boolean onTouch(View v, MotionEvent event) {
         //把捕获的事件交给ScaleGestureDetector处理,在onScale执行
         mDetector.onTouchEvent(event);
+
+        //图片自由移动代码的编写
+
+        //中心点的XY坐标
+        float x=0;
+        float y=0;
+
+        //获取多点触控的数量
+        int pointCount=event.getPointerCount();
+
+        for(int i=0;i< pointCount;i++){
+            x+=event.getX(i);
+            y+=event.getY(i);
+        }
+
+        x/=pointCount;
+        y/=pointCount;
+
+        if(mLastPointerCount!=pointCount){
+            //如果触控的点发生了变化，重新记录中心点
+            isCanDrag=false;
+            mLastX=x;
+            mLastY=y;
+        }
+
+        //记录最后一次多少个点触控
+        mLastPointerCount=pointCount;
+
+        switch (event.getAction()){
+            case MotionEvent.ACTION_MOVE:
+                //获取中心点改变后的偏移量
+                float dx=x-mLastX;
+                float dy=y-mLastY;
+
+                //如果图片不能移动
+                if(!isCanDrag){
+                    isCanDrag=isMoveAction(dx,dy);
+                }
+
+                //如果图片能移动
+                if(isCanDrag){
+                    RectF rectF=getMatrixRectF();
+                    if(getDrawable()!=null){
+
+                        //如果图片宽度小于控件宽度，不允许横向移动
+                        if(rectF.width()<getWidth()){
+                            dx=0;
+                        }
+
+                        //如果图片宽度小于控件高度，不允许横向移动
+                        if(rectF.height()<getHeight()){
+                            dy=0;
+                        }
+
+                        //图片可以移动
+                        mScaleMatrix.postTranslate(dx,dy);
+                        setImageMatrix(mScaleMatrix);
+                    }
+                }
+
+                //记录上一次的中心点XY
+                mLastX=x;
+                mLastY=y;
+                break;
+            case MotionEvent.ACTION_UP:
+                //手指抬起后，没有触控的点
+                mLastPointerCount=0;
+                break;
+        }
+
         return true;
+    }
+
+    /**
+     * 判断是否是move
+     * @param dx
+     * @param dy
+     * @return
+     */
+    private boolean isMoveAction(float dx,float dy){
+        return Math.sqrt(dx*dx+dy*dy)>mTouchSlop;
     }
 }
