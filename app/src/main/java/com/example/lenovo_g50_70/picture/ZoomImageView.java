@@ -2,6 +2,7 @@ package com.example.lenovo_g50_70.picture;
 
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
@@ -13,8 +14,16 @@ import android.widget.ImageView;
  */
 
 public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGlobalLayoutListener{
+    //是否第一次加载
+    private boolean mOnce=false;
+    //初始化缩放的值
+    private float mInitScale;
+    //双击放大的值
+    private float mMidScale;
+    //最大的放大值
+    private float mMaxScale;
 
-    private boolean mOnce=false;//是否第一次加载
+    private Matrix mScaleMatrix;
 
     public ZoomImageView(Context context) {
         this(context,null);
@@ -30,11 +39,14 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     }
 
     private void init() {
+        mScaleMatrix=new Matrix();
+        super.setScaleType(ScaleType.MATRIX);
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        //注册接口
         getViewTreeObserver().addOnGlobalLayoutListener(this);
     }
 
@@ -43,6 +55,7 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        //反注册接口
         getViewTreeObserver().removeOnGlobalLayoutListener(this);
     }
 
@@ -73,7 +86,21 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
                 //图片宽高都大于或小于控件的宽高，以此进行放大或缩小
                 scale=Math.min(width*1.0f/dw,height*1.0f/dh);
             }
-            mOnce=true;
+            //得到初始化时缩放的比例
+            mInitScale=scale;
+            mMaxScale=mInitScale*4;
+            mMidScale=mInitScale*2;
+
+            //将图片移动至控件的中心
+            int dx=getWidth()/2-dw/2;
+            int dy=getHeight()/2-dh/2;
+            //平移
+            mScaleMatrix.postTranslate(dx,dy);
+            //缩放
+            mScaleMatrix.postScale(mInitScale,mInitScale,width/2,height/2);
+            //设置Maatrix
+            setImageMatrix(mScaleMatrix);
+           mOnce=true;
         }
     }
 }
