@@ -6,6 +6,9 @@ import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
+import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 
@@ -13,7 +16,8 @@ import android.widget.ImageView;
  * Created by lenovo-G50-70 on 2017/6/24.
  */
 
-public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGlobalLayoutListener{
+public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGlobalLayoutListener,
+        ScaleGestureDetector.OnScaleGestureListener,View.OnTouchListener{
     //是否第一次加载
     private boolean mOnce=false;
     //初始化缩放的值
@@ -24,6 +28,8 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     private float mMaxScale;
 
     private Matrix mScaleMatrix;
+    //捕获用户多点触控时缩放的比例
+    private ScaleGestureDetector mDetector;
 
     public ZoomImageView(Context context) {
         this(context,null);
@@ -35,12 +41,15 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
 
     public ZoomImageView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init();
+        init(context);
     }
 
-    private void init() {
+    private void init(Context context) {
         mScaleMatrix=new Matrix();
-        super.setScaleType(ScaleType.MATRIX);
+        setScaleType(ScaleType.MATRIX);
+        //上下文，接口对象
+        mDetector =new ScaleGestureDetector(context,this);
+        setOnTouchListener(this);
     }
 
     @Override
@@ -102,5 +111,57 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
             setImageMatrix(mScaleMatrix);
            mOnce=true;
         }
+    }
+
+    //获取当前图片的缩放值
+    public float getScale(){
+        float[] values =new float[9];
+        //拿到Matrix的值
+        mScaleMatrix.getValues(values);
+        return values[Matrix.MSCALE_X];
+    }
+
+    @Override   //缩放区间mInitScale-maxScale
+    public boolean onScale(ScaleGestureDetector detector) {
+        //获取当前图片的缩放值
+        float scale=getScale();
+        //获取当前用户想缩放的值，大于1.0代表放大，小于1.0代表缩小
+        float scaleFactor=detector.getScaleFactor();
+        if(getDrawable()==null){
+            return true;
+        }
+        //缩放范围的控制，如果当前缩放比例小于最大缩放比例,并且想放大.如果当前缩放比例大于最小缩放比例，并且想缩小
+        if((scale<mMaxScale && scaleFactor>1.0f)||(scale>mInitScale && scaleFactor<1.0f)){
+            //如果想缩小，缩小的比例也不能小于最小比例
+            if(scale*scaleFactor<mInitScale){
+                //当小于最小比例时，缩放最小比例
+                scaleFactor=mInitScale/scale;
+            }
+            //同理，放大也不能超过放大的最大比例
+            if(scale*scaleFactor>mMaxScale){
+                scaleFactor=mMaxScale/scale;
+            }
+            //放大缩小平移等操作
+            mScaleMatrix.postScale(scaleFactor,scaleFactor,getWidth()/2,getHeight()/2);
+            setImageMatrix(mScaleMatrix);
+        }
+        return true;
+    }
+
+    @Override
+    public boolean onScaleBegin(ScaleGestureDetector detector) {
+        return true;
+    }
+
+    @Override
+    public void onScaleEnd(ScaleGestureDetector detector) {
+
+    }
+
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        //把捕获的事件交给ScaleGestureDetector处理,在onScale执行
+        mDetector.onTouchEvent(event);
+        return true;
     }
 }
