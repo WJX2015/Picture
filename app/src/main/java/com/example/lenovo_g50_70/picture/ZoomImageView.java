@@ -7,6 +7,7 @@ import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
@@ -32,19 +33,21 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     private Matrix mScaleMatrix;
     //捕获用户多点触控时缩放的比例
     private ScaleGestureDetector mDetector;
-    //自由移动------------------------------
+
+    //自由移动在OnTouch方法里实现-------------
     //记录上一次多点触控的数量
     private int mLastPointerCount;
     //记录上一次多点触控的中心点
     private float mLastX;
     private float mLastY;
-
     private int mTouchSlop;
     private boolean isCanDrag;
-
     //图片是否需要边界检查
     private boolean isCheckLeftAndRight;
     private boolean isCheckTopAndBottom;
+
+    //双击放大与缩小----------------------
+    private GestureDetector mGestureDetector;
 
     public ZoomImageView(Context context) {
         this(context,null);
@@ -67,6 +70,24 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
         setOnTouchListener(this);
 
         mTouchSlop= ViewConfiguration.get(context).getScaledTouchSlop();
+        mGestureDetector=new GestureDetector(context,new GestureDetector.SimpleOnGestureListener(){
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                //用户点击哪里，哪里就是缩放中心
+                float x=e.getX();
+                float y=e.getY();
+
+                if(getScale()<mMidScale){//双击放大
+                    mScaleMatrix.postScale(mMidScale/getScale(),mMidScale/getScale(),x,y);
+                    setImageMatrix(mScaleMatrix);
+                }else{//双击缩小
+                    mScaleMatrix.postScale(mInitScale/getScale(),mInitScale/getScale(),x,y);
+                    setImageMatrix(mScaleMatrix);
+                }
+
+                return true;
+            }
+        });
     }
 
     @Override
@@ -238,6 +259,12 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
+
+        //双击图片
+        if(mGestureDetector.onTouchEvent(event)){
+            return true;
+        }
+
         //把捕获的事件交给ScaleGestureDetector处理,在onScale执行
         mDetector.onTouchEvent(event);
 
