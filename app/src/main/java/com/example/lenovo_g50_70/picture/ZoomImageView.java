@@ -42,6 +42,10 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     private int mTouchSlop;
     private boolean isCanDrag;
 
+    //图片是否需要边界检查
+    private boolean isCheckLeftAndRight;
+    private boolean isCheckTopAndBottom;
+
     public ZoomImageView(Context context) {
         this(context,null);
     }
@@ -280,18 +284,25 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
                     RectF rectF=getMatrixRectF();
                     if(getDrawable()!=null){
 
+                        isCheckLeftAndRight=true;
+                        isCheckTopAndBottom=true;
+
                         //如果图片宽度小于控件宽度，不允许横向移动
                         if(rectF.width()<getWidth()){
+                            isCheckLeftAndRight=false;
                             dx=0;
                         }
 
                         //如果图片宽度小于控件高度，不允许横向移动
                         if(rectF.height()<getHeight()){
+                            isCheckTopAndBottom=false;
                             dy=0;
                         }
 
                         //图片可以移动
                         mScaleMatrix.postTranslate(dx,dy);
+                        //边界检查,以防拖动后边界出现白边
+                        checkBorderWhenTranslate();
                         setImageMatrix(mScaleMatrix);
                     }
                 }
@@ -307,6 +318,39 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
         }
 
         return true;
+    }
+
+    //当移动时进行移动检查
+    private void checkBorderWhenTranslate() {
+        RectF rectF =getMatrixRectF();
+
+        float deltaX=0;
+        float deltaY=0;
+
+        int width=getWidth();
+        int height =getHeight();
+
+        //顶部出现白边，并需要检查边界
+        if(rectF.top>0 && isCheckTopAndBottom){
+            deltaY=-rectF.top;
+        }
+
+        //底部出现白边，并需要检查边界
+        if(rectF.bottom<height && isCheckTopAndBottom){
+            deltaY=height-rectF.bottom;
+        }
+
+        //左部出现白边，并需要检查边界
+        if(rectF.left>0 && isCheckLeftAndRight){
+            deltaX=-rectF.left;
+        }
+
+        //右部出现白边，并需要检查边界
+        if(rectF.right<width && isCheckLeftAndRight){
+            deltaX=width-rectF.right;
+        }
+
+        mScaleMatrix.postTranslate(deltaX,deltaY);
     }
 
     /**
