@@ -48,6 +48,8 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
 
     //双击放大与缩小----------------------
     private GestureDetector mGestureDetector;
+    //防止用户在图片放大或缩小过程中还在双击
+    private boolean isAutoScale;
 
     public ZoomImageView(Context context) {
         this(context,null);
@@ -73,16 +75,29 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
         mGestureDetector=new GestureDetector(context,new GestureDetector.SimpleOnGestureListener(){
             @Override
             public boolean onDoubleTap(MotionEvent e) {
+
+                if(isAutoScale)
+                    return true;
+
                 //用户点击哪里，哪里就是缩放中心
                 float x=e.getX();
                 float y=e.getY();
 
                 if(getScale()<mMidScale){//双击放大
-                    mScaleMatrix.postScale(mMidScale/getScale(),mMidScale/getScale(),x,y);
-                    setImageMatrix(mScaleMatrix);
+
+                    //mScaleMatrix.postScale(mMidScale/getScale(),mMidScale/getScale(),x,y);
+                    //setImageMatrix(mScaleMatrix);
+
+                    postDelayed(new AutoScaleRunnable(mMidScale,x,y),16);//缓慢放大
+                    isAutoScale=true;
+
                 }else{//双击缩小
-                    mScaleMatrix.postScale(mInitScale/getScale(),mInitScale/getScale(),x,y);
-                    setImageMatrix(mScaleMatrix);
+
+                    //mScaleMatrix.postScale(mInitScale/getScale(),mInitScale/getScale(),x,y);
+                    //setImageMatrix(mScaleMatrix);
+
+                    postDelayed(new AutoScaleRunnable(mInitScale,x,y),16);//缓慢缩小
+                    isAutoScale=true;
                 }
 
                 return true;
@@ -389,4 +404,54 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
     private boolean isMoveAction(float dx,float dy){
         return Math.sqrt(dx*dx+dy*dy)>mTouchSlop;
     }
+
+    //图片自动缓慢放大或缩小
+    private class AutoScaleRunnable implements Runnable{
+        //目标缩放比例
+        private float mTargetScale;
+        //缩放中心点
+        private float x,y;
+
+        private final float BIGGER=1.07f;
+        private final float SMALL =0.93f;
+
+        private float tmpScale;//临时变量
+
+        public AutoScaleRunnable(float targetScale, float x, float y) {
+            mTargetScale = targetScale;
+            this.x = x;
+            this.y = y;
+
+            //想放大
+            if(getScale()<mTargetScale){
+                tmpScale=BIGGER;
+            }
+
+            //有可能getScale()==mTargetScale
+
+            //想缩小
+            if(getScale()>mTargetScale){
+                tmpScale=SMALL;
+            }
+        }
+
+        @Override
+        public void run() {
+            mScaleMatrix.postScale(tmpScale,tmpScale,x,y);
+            checkBorderAndCenterWhenScale();
+            setImageMatrix(mScaleMatrix);
+
+            float currentScale=getScale();
+            if((tmpScale>1.0f && currentScale<mTargetScale)||(tmpScale<1.0f && currentScale>mTargetScale)){
+                postDelayed(this,16);
+            }else{
+                float scale =mTargetScale/currentScale;
+                mScaleMatrix.postScale(scale,scale,x,y);
+                checkBorderAndCenterWhenScale();
+                setImageMatrix(mScaleMatrix);
+                isAutoScale=false;
+            }
+        }
+    }
+
 }
