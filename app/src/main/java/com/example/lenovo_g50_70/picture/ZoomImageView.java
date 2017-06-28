@@ -6,6 +6,8 @@ import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.support.v4.view.ViewPager;
+import android.support.v7.widget.AppCompatImageView;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -15,11 +17,12 @@ import android.view.ViewConfiguration;
 import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 
+
 /**
  * Created by lenovo-G50-70 on 2017/6/24.
  */
 
-public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGlobalLayoutListener,
+public class ZoomImageView extends AppCompatImageView implements ViewTreeObserver.OnGlobalLayoutListener,
         ScaleGestureDetector.OnScaleGestureListener,View.OnTouchListener{
     //是否第一次加载
     private boolean mOnce=false;
@@ -310,8 +313,25 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
         //记录最后一次多少个点触控
         mLastPointerCount=pointCount;
 
+        RectF rectF=getMatrixRectF();
         switch (event.getAction()){
+            case MotionEvent.ACTION_DOWN:
+                //判断图片是否处于放大状态
+                if(rectF.width()>getWidth()+0.01 || rectF.height()>getHeight()+0.01){//避免误差
+                    //请求不允许拦截
+                    if(getParent() instanceof ViewPager)
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+
+                break;
             case MotionEvent.ACTION_MOVE:
+                //判断图片是否处于放大状态
+                if(rectF.width()>getWidth()+0.01 || rectF.height()>getHeight()+0.01){//避免误差
+                    //请求不允许拦截
+                    if(getParent() instanceof ViewPager)
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+
                 //获取中心点改变后的偏移量
                 float dx=x-mLastX;
                 float dy=y-mLastY;
@@ -323,9 +343,7 @@ public class ZoomImageView extends ImageView implements ViewTreeObserver.OnGloba
 
                 //如果图片能移动
                 if(isCanDrag){
-                    RectF rectF=getMatrixRectF();
                     if(getDrawable()!=null){
-
                         isCheckLeftAndRight=true;
                         isCheckTopAndBottom=true;
 
